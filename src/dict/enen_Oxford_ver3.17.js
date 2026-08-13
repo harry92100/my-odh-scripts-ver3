@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.16';
+        return 'Oxford EN-EN Dictionary ver3.17 (Auto-Redirect Fix)';
     }
 
     setOptions(options) {
@@ -21,22 +21,39 @@ class encn_Oxford {
         return [].concat(...results).filter(x => x);
     }
 
+    async fetchDocument(url) {
+        try {
+            let html = await api.fetch(url);
+            if (!html) return null;
+
+            let parser = new DOMParser();
+            let doc = parser.parseFromString(html, 'text/html');
+            
+            // Kiểm tra xem có chứa nội dung từ điển thật hay không
+            let entry = doc.querySelector('.webtop-g') || doc.querySelector('.top-g') || doc.querySelector('.entry');
+            if (entry) return doc;
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }
+
     async findOxford(word) {
         if (!word) return [];
 
         let cleanWord = word.trim().toLowerCase().replace(/\s+/g, '-');
-        let dicturl = `https://www.oxfordlearnersdictionaries.com/definition/english/${encodeURIComponent(cleanWord)}`;
+        let baseUrl = `https://www.oxfordlearnersdictionaries.com/definition/english/${encodeURIComponent(cleanWord)}`;
+
+        // CƠ CHẾ SỬA LỖI 1: Thử đường dẫn gốc, nếu không thấy thì thử thêm hậu tố _1
+        let doc = await this.fetchDocument(baseUrl);
+        if (!doc) {
+            let fallbackUrl = `${baseUrl}_1`;
+            doc = await this.fetchDocument(fallbackUrl);
+        }
+
+        if (!doc) return [];
 
         try {
-            let html = await api.fetch(dicturl);
-            if (!html) return [];
-
-            let parser = new DOMParser();
-            let doc = parser.parseFromString(html, 'text/html');
-
-            let entry = doc.querySelector('.webtop-g') || doc.querySelector('.top-g');
-            if (!entry) return [];
-
             // 1. Từ vựng chính & Phiên âm UK / US
             let expression = doc.querySelector('.headword')?.textContent || word;
 
@@ -79,9 +96,21 @@ class encn_Oxford {
                 return `[${formatted}]`;
             };
 
+            // Tránh lỗi Regex nếu từ chứa ký tự đặc biệt
+            let escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             let highlightWord = (text) => {
-                let reg = new RegExp(`\\b${word}\\b`, 'gi');
+                let reg = new RegExp(`\\b${escapeRegex(word)}\\b`, 'gi');
                 return text.replace(reg, `<b>$&</b>`);
+            };
+
+            // Hàm kiểm tra xem phần tử có nằm trong Idiom (.idm-g) hay không
+            let isInsideIdiom = (el) => {
+                let p = el.parentElement;
+                while (p) {
+                    if (p.classList && p.classList.contains('idm-g')) return true;
+                    p = p.parentElement;
+                }
+                return false;
             };
 
             let entries = [];
@@ -89,8 +118,7 @@ class encn_Oxford {
 
             // --- A. BÓC TÁCH NÉT NGHĨA THƯỜNG (SENSES) ---
             let allSenses = Array.from(doc.querySelectorAll('.sense'));
-            // Lọc loại bỏ các sense thuộc khối Idiom (.idm-g)
-            let regularSenses = allSenses.filter(s => !s.closest('.idm-g'));
+            let regularSenses = allSenses.filter(s => !isInsideIdiom(s));
 
             regularSenses.forEach((sense) => {
                 let defText = sense.querySelector('.def')?.textContent;
@@ -108,7 +136,6 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // Lấy TẤT CẢ ví dụ (không cắt JS để Anki lưu trọn vẹn)
                 let examples = Array.from(sense.querySelectorAll('.examples .x'));
                 let exListHtml = '';
                 examples.forEach((ex) => {
@@ -116,10 +143,7 @@ class encn_Oxford {
                     exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // FIELD 1: Definitions (Độc lập 100% - CHỈ ĐỊNH NGHĨA)
                 let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
-
-                // FIELD 2: ExtraInfo (Độc lập 100% - CHỈ VÍ DỤ)
                 let extrainfoBlock = exListHtml 
                     ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
                     : '';
@@ -128,8 +152,8 @@ class encn_Oxford {
                     css: encn_Oxford.renderCSS(),
                     expression: globalIndex === 0 ? expression : '\u200B',
                     reading: globalIndex === 0 ? reading : '',
-                    definitions: [defBlock],     // Gửi duy nhất Định nghĩa sang Anki
-                    extrainfo: extrainfoBlock,   // Gửi duy nhất Ví dụ sang Anki
+                    definitions: [defBlock],
+                    extrainfo: extrainfoBlock,
                     audios: globalIndex === 0 ? audios : []
                 });
                 globalIndex++;
@@ -145,13 +169,11 @@ class encn_Oxford {
                     let defText = sense.querySelector('.def')?.textContent;
                     if (!defText) return;
 
-                    // Nhãn Idiom chuẩn xác
                     let posHtml = `<span class="pos idiom-tag">idiom</span>`;
                     if (idmTitle) {
                         posHtml += `<strong class="idm-title">${idmTitle}</strong>`;
                     }
 
-                    // Lấy TẤT CẢ ví dụ của Idiom
                     let examples = Array.from(sense.querySelectorAll('.examples .x'));
                     let exListHtml = '';
                     examples.forEach((ex) => {
@@ -159,10 +181,7 @@ class encn_Oxford {
                         exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                     });
 
-                    // FIELD 1: Definitions (Độc lập 100% - CHỈ ĐỊNH NGHĨA IDIOM)
                     let defBlock = `<div class="odh-def-box">${posHtml} <span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
-
-                    // FIELD 2: ExtraInfo (Độc lập 100% - CHỈ VÍ DỤ IDIOM)
                     let extrainfoBlock = exListHtml 
                         ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
                         : '';
@@ -189,36 +208,25 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* 1. ÉP KHUNG NỘI BỘ THÀNH FLEXBOX ĐỂ SẮP XẾP THỨ TỰ */
                 .entry, .item, .odh-entry, .odh-item, [class*="entry"], [class*="item"] {
                     display: flex !important;
                     flex-direction: column !important;
                 }
-
-                /* Header (Phiên âm, từ vựng) xếp trên cùng (Order 0) */
                 .expression, .reading, .phonetic, .audios, .header, [class*="header"] {
                     order: 0 !important;
                 }
-
-                /* KHỐI ĐỊNH NGHĨA BẮT BUỘC XẾP TRÊN (Order 1) */
                 .definitions, .odh-definitions, [class*="definition"] {
                     order: 1 !important;
                     margin-bottom: 2px !important;
                 }
-
-                /* KHỐI VÍ DỤ BẮT BUỘC XẾP DƯỚI (Order 2) */
                 .extrainfo, .odh-extrainfo, [class*="extrainfo"], [class*="extra"] {
                     order: 2 !important;
                     margin-top: 2px !important;
                     margin-bottom: 8px !important;
                 }
-
-                /* GIỚI HẠN HIỂN THỊ TỐI ĐA 2 VÍ DỤ TRÊN POP-UP (Anki vẫn nhận đủ 100%) */
                 ul.sents li.sent:nth-child(n+3) {
                     display: none !important;
                 }
-
-                /* Style nhãn POS thường */
                 span.pos {
                     font-size: 0.85em !important;
                     margin-right: 6px !important;
@@ -230,24 +238,18 @@ class encn_Oxford {
                     display: inline-block !important;
                     text-transform: none !important;
                 }
-
-                /* Style nhãn Idiom riêng biệt màu cam */
                 span.pos.idiom-tag {
                     background-color: #e65100 !important;
                 }
-
                 strong.idm-title {
                     color: #b71c1c !important;
                     font-weight: bold !important;
                     margin-right: 6px !important;
                 }
-
                 span.eng_tran {
                     color: #222222 !important;
                     font-weight: 500 !important;
                 }
-
-                /* Khung danh sách ví dụ */
                 ul.sents {
                     font-size: 0.9em !important;
                     list-style: square inside !important;
@@ -257,17 +259,14 @@ class encn_Oxford {
                     border-radius: 4px !important;
                     border-left: 3px solid #0d47a1 !important;
                 }
-
                 li.sent {
                     margin: 3px 0 !important;
                     padding: 0 !important;
                     color: #333333 !important;
                 }
-
                 span.eng_sent {
                     margin-right: 5px !important;
                 }
-
                 li.sent b {
                     color: #0d47a1 !important;
                     font-weight: bold !important;
