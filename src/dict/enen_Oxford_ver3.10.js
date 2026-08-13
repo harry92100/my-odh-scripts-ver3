@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.9';
+        return 'Oxford EN-EN Dictionary ver3.10';
     }
 
     setOptions(options) {
@@ -113,7 +113,7 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // Bóc tách câu ví dụ cho trường ExtraInfo (Gửi Anki)
+                // Bóc tách câu ví dụ cho trường ExtraInfo
                 let allExamples = sense.querySelectorAll('.examples .x');
                 let allExListHtml = '';
 
@@ -132,7 +132,8 @@ class encn_Oxford {
 
                 entries.push({
                     css: encn_Oxford.renderCSS(),
-                    expression: index === 0 ? expression : '', // Để rỗng ở nghĩa phụ để không bị lặp tên từ
+                    // Dùng Zero-Width Space \u200B cho nét nghĩa phụ để tránh ODH chèn lại tên từ
+                    expression: index === 0 ? expression : '\u200B',
                     reading: index === 0 ? reading : '',
                     definitions: [defBlock],
                     audios: index === 0 ? audios : [],
@@ -150,34 +151,33 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Chỉ áp dụng Flexbox xếp cột trên đúng container .entry của ODH */
-                .entry {
+                /* Nhắm chính xác khung chứa từng Nét nghĩa để áp dụng Flexbox xếp cột */
+                div:has(> .odh-def-box),
+                div:has(> .odh-extra),
+                .entry, .item, .odh-entry, .odh-item {
                     display: flex !important;
                     flex-direction: column !important;
                 }
 
-                /* 1. Header (Từ vựng + Phiên âm) xếp TRÊN CÙNG */
-                .entry > .expression,
-                .entry > .head {
+                /* Order 1: Tiêu đề từ vựng + Phiên âm luôn nằm TRÊN CÙNG */
+                .expression, .odh-expression, .head, .reading, .odh-reading {
                     order: 1 !important;
                 }
 
-                /* 2. Định nghĩa (Definitions) xếp BÊN DƯỚI Header */
-                .entry > .definitions,
-                .odh-def-box {
+                /* Order 2: Ô Định nghĩa bắt buộc nằm ở GIỮA */
+                .definitions, .odh-definitions, .odh-def-box {
                     order: 2 !important;
                     margin-top: 4px !important;
                 }
 
-                /* 3. Ví dụ (ExtraInfo) xếp DƯỚI CÙNG */
-                .entry > .extrainfo,
-                .odh-extra {
+                /* Order 3: Khung Ví dụ bắt buộc đẩy xuống DƯỚI CÙNG */
+                .extrainfo, .odh-extrainfo, .odh-extra {
                     order: 3 !important;
                     margin-top: 6px !important;
                     margin-bottom: 10px !important;
                 }
 
-                /* GIỚI HẠN TỐI ĐA 2 CÂU VÍ DỤ TRÊN POP-UP (Ẩn từ câu thứ 3 trở đi) */
+                /* Giới hạn hiển thị tối đa 2 câu ví dụ trên Pop-up */
                 .odh-extra ul.sents li.sent:nth-child(n+3),
                 .extrainfo ul.sents li.sent:nth-child(n+3) {
                     display: none !important;
@@ -201,7 +201,7 @@ class encn_Oxford {
                     font-weight: 500 !important;
                 }
 
-                /* Frame danh sách ví dụ */
+                /* Khung danh sách ví dụ */
                 ul.sents {
                     font-size: 0.9em !important;
                     list-style: square inside !important;
