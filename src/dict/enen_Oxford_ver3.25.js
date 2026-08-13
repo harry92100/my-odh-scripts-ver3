@@ -6,27 +6,159 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.23 (Collocation Fix)';
+        return 'Oxford EN-EN Dictionary ver3.25 (Full Grammar & Irregular Verbs)';
     }
 
     setOptions(options) {
         this.options = options;
     }
 
-    async findTerm(word) {
-        this.word = word;
-        let deflection = await api.deinflect(word) || [];
+    // BỘ CHUYỂN ĐỔI TỪ GỐC TIẾNG ANH (Hỗ trợ cả Động từ Quy tắc & Bất quy tắc)
+    getEnglishLemmas(word) {
+        let w = word.trim().toLowerCase();
+        let candidates = [w];
 
-        // Lọc rác chữ cái đơn lẻ nếu từ tra dài > 2 ký tự
-        let cleanWordStr = word.trim();
-        if (cleanWordStr.length > 2) {
-            deflection = deflection.filter(x => x && x.trim().length > 1);
+        // BẢNG TRA CỨU ĐỘNG TỪ BẤT QUY TẮC (Past Simple & Past Participle)
+        const irregularVerbs = {
+            "went": "go", "gone": "go",
+            "swam": "swim", "swum": "swim",
+            "wrote": "write", "written": "write",
+            "drove": "drive", "driven": "drive",
+            "broke": "break", "broken": "break",
+            "took": "take", "taken": "take",
+            "gave": "give", "given": "give",
+            "saw": "see", "seen": "see",
+            "ate": "eat", "eaten": "eat",
+            "spoke": "speak", "spoken": "speak",
+            "chose": "choose", "chosen": "choose",
+            "ran": "run",
+            "came": "come",
+            "began": "begin", "begun": "begin",
+            "forgot": "forget", "forgotten": "forget",
+            "got": "get", "gotten": "get",
+            "bought": "buy",
+            "thought": "think",
+            "taught": "teach",
+            "caught": "catch",
+            "brought": "bring",
+            "built": "build",
+            "felt": "feel",
+            "left": "leave",
+            "lost": "lose",
+            "meant": "mean",
+            "paid": "pay",
+            "said": "say",
+            "sold": "sell",
+            "sent": "send",
+            "slept": "sleep",
+            "spent": "spend",
+            "stood": "stand",
+            "told": "tell",
+            "understood": "understand",
+            "won": "win",
+            "wore": "wear", "worn": "wear",
+            "flew": "fly", "flown": "fly",
+            "drew": "draw", "drawn": "draw",
+            "grew": "grow", "grown": "grow",
+            "knew": "know", "known": "know",
+            "threw": "throw", "thrown": "throw",
+            "blew": "blow", "blown": "blow",
+            "sang": "sing", "sung": "sing",
+            "rang": "ring", "rung": "ring",
+            "sank": "sink", "sunk": "sink",
+            "drank": "drink", "drunk": "drink",
+            "became": "become",
+            "bent": "bend",
+            "bit": "bite", "bitten": "bite",
+            "bled": "bleed",
+            "blew": "blow",
+            "bound": "bind",
+            "drew": "draw",
+            "fed": "feed",
+            "fought": "fight",
+            "found": "find",
+            "froze": "freeze", "frozen": "freeze",
+            "hung": "hang",
+            "hid": "hide", "hidden": "hide",
+            "held": "hold",
+            "kept": "keep",
+            "laid": "lay",
+            "led": "lead",
+            "met": "meet", "ridden": "ride", "rode": "ride",
+            "rose": "rise", "risen": "rise",
+            "shook": "shake", "shaken": "shake",
+            "shot": "shoot",
+            "stole": "steal", "stolen": "steal",
+            "swore": "swear", "sworn": "swear",
+            "tore": "tear", "torn": "tear"
+        };
+
+        // Check động từ bất quy tắc
+        if (irregularVerbs[w]) {
+            candidates.push(irregularVerbs[w]);
         }
 
-        let searchList = Array.from(new Set([word, ...deflection]));
+        // Xử lý đuôi -ing (debating -> debate, running -> run, playing -> play)
+        if (w.endsWith('ing') && w.length > 4) {
+            let base = w.slice(0, -3);
+            candidates.push(base);
+            candidates.push(base + 'e');
+            if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) {
+                candidates.push(base.slice(0, -1));
+            }
+        }
+
+        // Xử lý đuôi -ed (played -> play, studied -> study, debated -> debate)
+        if (w.endsWith('ed') && w.length > 3) {
+            let base = w.slice(0, -2);
+            candidates.push(base);
+            candidates.push(base + 'e');
+            if (w.endsWith('ied')) {
+                candidates.push(w.slice(0, -3) + 'y');
+            }
+            if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) {
+                candidates.push(base.slice(0, -1));
+            }
+        }
+
+        // Xử lý đuôi -s / -es / -ies (cats -> cat, boxes -> box, studies -> study)
+        if (w.endsWith('s') && !w.endsWith('ss') && w.length > 2) {
+            if (w.endsWith('ies')) {
+                candidates.push(w.slice(0, -3) + 'y');
+            } else if (w.endsWith('es')) {
+                candidates.push(w.slice(0, -2));
+                candidates.push(w.slice(0, -1));
+            } else {
+                candidates.push(w.slice(0, -1));
+            }
+        }
+
+        return Array.from(new Set(candidates));
+    }
+
+    async findTerm(word) {
+        this.word = word;
+        
+        let odhDeflection = await api.deinflect(word) || [];
+        let autoLemmas = this.getEnglishLemmas(word);
+        let rawCandidates = [word, ...autoLemmas, ...odhDeflection];
+        
+        let cleanWordStr = word.trim();
+        if (cleanWordStr.length > 2) {
+            rawCandidates = rawCandidates.filter(x => x && x.trim().length > 1);
+        }
+
+        let searchList = Array.from(new Set(rawCandidates));
+
+        // Tải dữ liệu song song cực nhanh
         let promises = searchList.map(x => this.findOxford(x));
         let results = await Promise.all(promises);
-        return [].concat(...results).filter(x => x);
+        
+        let validResults = results.filter(r => r && r.length > 0);
+        if (validResults.length > 0) {
+            return validResults[0];
+        }
+        return [];
     }
 
     async fetchDocument(url) {
@@ -49,12 +181,10 @@ class encn_Oxford {
 
         let cleanWord = word.trim().toLowerCase().replace(/\s+/g, '-');
         let baseUrl = `https://www.oxfordlearnersdictionaries.com/definition/english/${encodeURIComponent(cleanWord)}`;
+        let fallbackUrl = `${baseUrl}_1`;
 
-        let doc = await this.fetchDocument(baseUrl);
-        if (!doc) {
-            let fallbackUrl = `${baseUrl}_1`;
-            doc = await this.fetchDocument(fallbackUrl);
-        }
+        let docs = await Promise.all([this.fetchDocument(baseUrl), this.fetchDocument(fallbackUrl)]);
+        let doc = docs[0] || docs[1];
 
         if (!doc) return [];
 
@@ -115,7 +245,6 @@ class encn_Oxford {
                 return false;
             };
 
-            // HÀM BÓC TÁCH CẢ CỤM MẪU (.cf) VÀ CÂU VÍ DỤ (.x)
             let extractExamples = (container) => {
                 let exampleLiEls = container.querySelectorAll('.examples > li, .examples li');
                 let exListHtml = '';
