@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.14';
+        return 'Oxford EN-EN Dictionary ver3.16';
     }
 
     setOptions(options) {
@@ -37,10 +37,9 @@ class encn_Oxford {
             let entry = doc.querySelector('.webtop-g') || doc.querySelector('.top-g');
             if (!entry) return [];
 
-            // 1. Từ vựng chính
+            // 1. Từ vựng chính & Phiên âm UK / US
             let expression = doc.querySelector('.headword')?.textContent || word;
 
-            // 2. Phiên âm UK / US
             let phUk = doc.querySelector('.phons_br .phon')?.textContent || '';
             let phUs = doc.querySelector('.phons_n_am .phon')?.textContent || '';
             let reading = '';
@@ -48,11 +47,10 @@ class encn_Oxford {
                 reading = `UK ${phUk}  US ${phUs}`.trim();
             }
 
-            // 3. File âm thanh Audio MP3
+            // 2. Audio MP3
             let audios = [];
             let ukAudioEl = doc.querySelector('.phons_br .audio_play_button');
             let usAudioEl = doc.querySelector('.phons_n_am .audio_play_button');
-            
             if (ukAudioEl && ukAudioEl.getAttribute('data-src-mp3')) {
                 audios.push(ukAudioEl.getAttribute('data-src-mp3'));
             }
@@ -60,9 +58,8 @@ class encn_Oxford {
                 audios.push(usAudioEl.getAttribute('data-src-mp3'));
             }
 
-            // 4. Loại từ chính (POS)
+            // 3. Loại từ chính (POS) & Ngữ pháp chung
             let mainPos = doc.querySelector('.pos')?.textContent || '';
-
             let topGrammarEl = doc.querySelector('.webtop-g .grammar') || 
                                doc.querySelector('.top-g .grammar') || 
                                doc.querySelector('.pos + .grammar');
@@ -71,17 +68,14 @@ class encn_Oxford {
             let formatGrammar = (str) => {
                 if (!str) return '';
                 let clean = str.replace(/\[/g, '').replace(/\]/g, '').trim();
-                
                 if (/countable,\s*uncountable/i.test(clean) || /uncountable,\s*countable/i.test(clean)) {
                     return '[C, U]';
                 }
-                
                 let formatted = clean
                     .replace(/\bcountable\b/gi, 'C')
                     .replace(/\buncountable\b/gi, 'U')
                     .replace(/\bsingular\b/gi, 'sing.')
                     .replace(/\bplural\b/gi, 'pl.');
-                    
                 return `[${formatted}]`;
             };
 
@@ -90,11 +84,15 @@ class encn_Oxford {
                 return text.replace(reg, `<b>$&</b>`);
             };
 
-            // 5. Bóc tách từng Nét nghĩa (Sense)
-            let senses = doc.querySelectorAll('.sense');
             let entries = [];
+            let globalIndex = 0;
 
-            senses.forEach((sense, index) => {
+            // --- A. BÓC TÁCH NÉT NGHĨA THƯỜNG (SENSES) ---
+            let allSenses = Array.from(doc.querySelectorAll('.sense'));
+            // Lọc loại bỏ các sense thuộc khối Idiom (.idm-g)
+            let regularSenses = allSenses.filter(s => !s.closest('.idm-g'));
+
+            regularSenses.forEach((sense) => {
                 let defText = sense.querySelector('.def')?.textContent;
                 if (!defText) return;
 
@@ -110,30 +108,74 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // Bóc tách câu ví dụ - Giới hạn CHÍNH XÁC TỐI ĐA 2 CÂU bằng .slice(0, 2)
-                let allExamples = Array.from(sense.querySelectorAll('.examples .x')).slice(0, 2);
+                // Lấy TẤT CẢ ví dụ (không cắt JS để Anki lưu trọn vẹn)
+                let examples = Array.from(sense.querySelectorAll('.examples .x'));
                 let exListHtml = '';
-
-                allExamples.forEach((ex) => {
+                examples.forEach((ex) => {
                     let exText = highlightWord(ex.textContent.trim());
                     exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // FIELD 1: Definition - Tách riêng 100% (chỉ chứa Định nghĩa + POS)
+                // FIELD 1: Definitions (Độc lập 100% - CHỈ ĐỊNH NGHĨA)
                 let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
 
-                // FIELD 2: ExtraInfo - Tách riêng 100% (chỉ chứa tối đa 2 ví dụ)
+                // FIELD 2: ExtraInfo (Độc lập 100% - CHỈ VÍ DỤ)
                 let extrainfoBlock = exListHtml 
                     ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
                     : '';
 
                 entries.push({
                     css: encn_Oxford.renderCSS(),
-                    expression: index === 0 ? expression : '\u200B',
-                    reading: index === 0 ? reading : '',
-                    definitions: [defBlock],     // Gửi sang ô Definition trong Anki
-                    extrainfo: extrainfoBlock,   // Gửi sang ô Example / ExtraInfo trong Anki
-                    audios: index === 0 ? audios : []
+                    expression: globalIndex === 0 ? expression : '\u200B',
+                    reading: globalIndex === 0 ? reading : '',
+                    definitions: [defBlock],     // Gửi duy nhất Định nghĩa sang Anki
+                    extrainfo: extrainfoBlock,   // Gửi duy nhất Ví dụ sang Anki
+                    audios: globalIndex === 0 ? audios : []
+                });
+                globalIndex++;
+            });
+
+            // --- B. BÓC TÁCH KHỐI THÀNH NGỮ (IDIOMS) ---
+            let idiomGroups = doc.querySelectorAll('.idm-g');
+            idiomGroups.forEach((idmGroup) => {
+                let idmTitle = idmGroup.querySelector('.idm')?.textContent?.trim();
+                let idmSenses = idmGroup.querySelectorAll('.sense');
+
+                idmSenses.forEach((sense) => {
+                    let defText = sense.querySelector('.def')?.textContent;
+                    if (!defText) return;
+
+                    // Nhãn Idiom chuẩn xác
+                    let posHtml = `<span class="pos idiom-tag">idiom</span>`;
+                    if (idmTitle) {
+                        posHtml += `<strong class="idm-title">${idmTitle}</strong>`;
+                    }
+
+                    // Lấy TẤT CẢ ví dụ của Idiom
+                    let examples = Array.from(sense.querySelectorAll('.examples .x'));
+                    let exListHtml = '';
+                    examples.forEach((ex) => {
+                        let exText = highlightWord(ex.textContent.trim());
+                        exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
+                    });
+
+                    // FIELD 1: Definitions (Độc lập 100% - CHỈ ĐỊNH NGHĨA IDIOM)
+                    let defBlock = `<div class="odh-def-box">${posHtml} <span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
+
+                    // FIELD 2: ExtraInfo (Độc lập 100% - CHỈ VÍ DỤ IDIOM)
+                    let extrainfoBlock = exListHtml 
+                        ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
+                        : '';
+
+                    entries.push({
+                        css: encn_Oxford.renderCSS(),
+                        expression: globalIndex === 0 ? expression : '\u200B',
+                        reading: globalIndex === 0 ? reading : '',
+                        definitions: [defBlock],
+                        extrainfo: extrainfoBlock,
+                        audios: globalIndex === 0 ? audios : []
+                    });
+                    globalIndex++;
                 });
             });
 
@@ -147,26 +189,36 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Ép khung item của ODH thành Flexbox chiều dọc */
-                .entry, .item, .odh-entry, .odh-item {
+                /* 1. ÉP KHUNG NỘI BỘ THÀNH FLEXBOX ĐỂ SẮP XẾP THỨ TỰ */
+                .entry, .item, .odh-entry, .odh-item, [class*="entry"], [class*="item"] {
                     display: flex !important;
                     flex-direction: column !important;
                 }
 
-                /* 1. ĐỊNH NGHĨA (.definitions) xếp LÊN TRÊN */
-                .definitions, .odh-definitions {
+                /* Header (Phiên âm, từ vựng) xếp trên cùng (Order 0) */
+                .expression, .reading, .phonetic, .audios, .header, [class*="header"] {
+                    order: 0 !important;
+                }
+
+                /* KHỐI ĐỊNH NGHĨA BẮT BUỘC XẾP TRÊN (Order 1) */
+                .definitions, .odh-definitions, [class*="definition"] {
                     order: 1 !important;
                     margin-bottom: 2px !important;
                 }
 
-                /* 2. VÍ DỤ (.extrainfo) xếp XUỐNG DƯỚI */
-                .extrainfo, .odh-extrainfo {
+                /* KHỐI VÍ DỤ BẮT BUỘC XẾP DƯỚI (Order 2) */
+                .extrainfo, .odh-extrainfo, [class*="extrainfo"], [class*="extra"] {
                     order: 2 !important;
                     margin-top: 2px !important;
-                    margin-bottom: 6px !important;
+                    margin-bottom: 8px !important;
                 }
 
-                /* Style nhãn POS & [C, U] */
+                /* GIỚI HẠN HIỂN THỊ TỐI ĐA 2 VÍ DỤ TRÊN POP-UP (Anki vẫn nhận đủ 100%) */
+                ul.sents li.sent:nth-child(n+3) {
+                    display: none !important;
+                }
+
+                /* Style nhãn POS thường */
                 span.pos {
                     font-size: 0.85em !important;
                     margin-right: 6px !important;
@@ -177,6 +229,17 @@ class encn_Oxford {
                     font-weight: bold !important;
                     display: inline-block !important;
                     text-transform: none !important;
+                }
+
+                /* Style nhãn Idiom riêng biệt màu cam */
+                span.pos.idiom-tag {
+                    background-color: #e65100 !important;
+                }
+
+                strong.idm-title {
+                    color: #b71c1c !important;
+                    font-weight: bold !important;
+                    margin-right: 6px !important;
                 }
 
                 span.eng_tran {
