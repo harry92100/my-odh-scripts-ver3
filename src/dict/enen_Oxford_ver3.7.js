@@ -5,9 +5,8 @@ class encn_Oxford {
         this.word = '';
     }
 
-    // Tên hiển thị trong mục cài đặt ODH
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.6';
+        return 'Oxford EN-EN Dictionary ver3.7';
     }
 
     setOptions(options) {
@@ -94,7 +93,7 @@ class encn_Oxford {
                 return text.replace(reg, `<b>$&</b>`);
             };
 
-            // 5. Bóc tách từng Nét nghĩa (Sense) thành các mục riêng biệt
+            // 5. Bóc tách từng Nét nghĩa (Sense)
             let senses = doc.querySelectorAll('.sense');
             let entries = [];
 
@@ -102,21 +101,19 @@ class encn_Oxford {
                 let defText = sense.querySelector('.def')?.textContent;
                 if (!defText) return;
 
-                // Ưu tiên grammar tại riêng Sense đó, nếu không có mới dùng grammar chung tiêu đề
                 let senseGrammarEl = sense.querySelector('.grammar') || 
                                      sense.querySelector('.sensetop .grammar') ||
                                      sense.querySelector('.grammar-g');
                 let grammarText = senseGrammarEl ? senseGrammarEl.textContent.trim() : topGrammarText;
                 let formattedGrammar = formatGrammar(grammarText);
 
-                // Ghép [Loại từ] + [Countability hoa: C, U]
                 let posInfo = mainPos;
                 if (formattedGrammar) {
                     posInfo += ` ${formattedGrammar}`;
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // Bóc tách TOÀN BỘ câu ví dụ dành riêng cho trường ExtraInfo
+                // Bóc tách TOÀN BỘ câu ví dụ dành riêng cho trường ExtraInfo (Gửi Anki)
                 let allExamples = sense.querySelectorAll('.examples .x');
                 let allExListHtml = '';
 
@@ -125,22 +122,16 @@ class encn_Oxford {
                     allExListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // Trường Definitions: CHỈ CHỨA Loại từ + Định nghĩa
+                // Definitions CHỈ CHỨA Loại từ + Định nghĩa (Cho Anki clean 100%)
                 let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
 
-                // Trường ExtraInfo: Chứa câu ví dụ
+                // ExtraInfo CHỈ CHỨA Ví dụ (Cho Anki clean 100%)
                 let extrainfo = allExListHtml 
                     ? `<div class="odh-extra"><ul class="sents">${allExListHtml}</ul></div>` 
                     : '';
 
-                // Thêm class đánh dấu cho các nét nghĩa phụ để ẩn header lặp bằng CSS
-                let entryCss = encn_Oxford.renderCSS();
-                if (index > 0) {
-                    entryCss += `<style>.odh-sub-entry { display: block; }</style>`;
-                }
-
                 entries.push({
-                    css: entryCss,
+                    css: encn_Oxford.renderCSS(),
                     expression: index === 0 ? expression : ' ',
                     reading: index === 0 ? reading : '',
                     definitions: [defBlock],
@@ -159,34 +150,47 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Đảm bảo khung chứa từng Entry của ODH hiển thị theo cột chuẩn */
+                /* Sắp xếp vị trí Pop-up bằng CSS Flexbox Order */
+                .entry, .item, div:has(> .odh-def-box) {
+                    display: flex !important;
+                    flex-direction: column !important;
+                }
+
+                /* 1. Header (Từ + Loa) nằm trên cùng */
                 .odh-expression, .expression, .head {
                     order: 1 !important;
                 }
 
-                .odh-def-box {
+                /* 2. Ô Định nghĩa nằm ở giữa */
+                .odh-def-box, div:has(> .odh-def-box) {
                     order: 2 !important;
-                    display: block !important;
-                    width: 100% !important;
                     margin-top: 4px !important;
                 }
 
-                .odh-extra {
+                /* 3. Khung Ví dụ nằm bên dưới Định nghĩa */
+                .odh-extra, div:has(> .odh-extra) {
                     order: 3 !important;
-                    display: block !important;
-                    width: 100% !important;
                     margin-top: 4px !important;
                     margin-bottom: 8px !important;
                 }
 
-                /* Tối đa 2 ví dụ xem trước trên Pop-up */
+                /* Xem trước tối đa 2 ví dụ trên Pop-up */
                 .odh-extra .sents li.sent:nth-child(n+3) {
                     display: none !important;
                 }
 
-                /* Định dạng nhãn và văn bản */
-                div.dis {font-weight: bold; margin-bottom:3px; padding:0;}
-                span.pos {text-transform:lowercase; font-size:0.85em; margin-right:5px; padding:2px 6px; color:white; background-color:#0d47a1; border-radius:3px; font-weight:normal; display:inline-block;}
+                /* Đã loại bỏ text-transform: lowercase để giữ nguyên chữ in hoa [C, U] */
+                span.pos {
+                    font-size:0.85em; 
+                    margin-right:5px; 
+                    padding:2px 6px; 
+                    color:white; 
+                    background-color:#0d47a1; 
+                    border-radius:3px; 
+                    font-weight:bold; 
+                    display:inline-block;
+                }
+                
                 span.tran {margin:0; padding:0; line-height:1.4;}
                 span.eng_tran {margin-right:3px; color:#222; font-weight:500;}
                 
