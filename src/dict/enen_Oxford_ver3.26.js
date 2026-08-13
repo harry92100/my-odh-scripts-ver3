@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.25 (Full Grammar & Irregular Verbs)';
+        return 'Oxford EN-EN Dictionary ver3.26 (Multi-POS & Verb-Form Support)';
     }
 
     setOptions(options) {
@@ -71,9 +71,7 @@ class encn_Oxford {
             "bent": "bend",
             "bit": "bite", "bitten": "bite",
             "bled": "bleed",
-            "blew": "blow",
             "bound": "bind",
-            "drew": "draw",
             "fed": "feed",
             "fought": "fight",
             "found": "find",
@@ -93,7 +91,6 @@ class encn_Oxford {
             "tore": "tear", "torn": "tear"
         };
 
-        // Check động từ bất quy tắc
         if (irregularVerbs[w]) {
             candidates.push(irregularVerbs[w]);
         }
@@ -150,15 +147,29 @@ class encn_Oxford {
 
         let searchList = Array.from(new Set(rawCandidates));
 
-        // Tải dữ liệu song song cực nhanh
+        // Tải dữ liệu song song cho TẤT CẢ các dạng từ (ví dụ cả 'discouraged' và 'discourage')
         let promises = searchList.map(x => this.findOxford(x));
         let results = await Promise.all(promises);
         
         let validResults = results.filter(r => r && r.length > 0);
-        if (validResults.length > 0) {
-            return validResults[0];
-        }
-        return [];
+        if (validResults.length === 0) return [];
+
+        // Gộp toàn bộ nét nghĩa của TẤT CẢ các từ loại (Tính từ + Động từ)
+        let combinedEntries = [].concat(...validResults);
+
+        // Lọc trùng lặp entry nếu các từ tìm kiếm trả về trùng trang
+        let uniqueEntries = [];
+        let seenDefs = new Set();
+
+        combinedEntries.forEach(entry => {
+            let signature = (entry.expression + '|' + (entry.definitions ? entry.definitions[0] : '')).trim();
+            if (!seenDefs.has(signature)) {
+                seenDefs.add(signature);
+                uniqueEntries.push(entry);
+            }
+        });
+
+        return uniqueEntries;
     }
 
     async fetchDocument(url) {
