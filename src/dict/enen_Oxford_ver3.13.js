@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.12';
+        return 'Oxford EN-EN Dictionary ver3.13';
     }
 
     setOptions(options) {
@@ -119,21 +119,20 @@ class encn_Oxford {
                     allExListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // Khối 1: Định nghĩa độc lập
-                let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
+                // 🎯 ĐIỂM CỐT LÕI: Gộp Định nghĩa + Ví dụ trực tiếp theo đúng thứ tự hiển thị
+                let combinedDefHtml = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
 
-                // Khối 2: Ví dụ độc lập
-                let extrainfoBlock = allExListHtml 
-                    ? `<div class="odh-extra"><ul class="sents">${allExListHtml}</ul></div>` 
-                    : '';
+                if (allExListHtml) {
+                    combinedDefHtml += `<div class="odh-extra"><ul class="sents">${allExListHtml}</ul></div>`;
+                }
 
                 entries.push({
                     css: encn_Oxford.renderCSS(),
                     expression: index === 0 ? expression : '\u200B',
                     reading: index === 0 ? reading : '',
-                    definitions: [defBlock],     // Xuất vào Field Definition trên Anki
-                    extrainfo: extrainfoBlock,   // Xuất vào Field ExtraInfo/Example trên Anki
-                    audios: index === 0 ? audios : []
+                    definitions: [combinedDefHtml],
+                    audios: index === 0 ? audios : [],
+                    extrainfo: '' // Bỏ trống để tránh việc ODH tự đẩy ví dụ lên trên
                 });
             });
 
@@ -147,27 +146,10 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Ép tất cả các thẻ cha chứa nội dung trong Pop-up sang dạng Flex Column */
-                div:has(> .definitions), 
-                div:has(> .extrainfo),
-                div:has(> .odh-def-box),
-                div:has(> .odh-extra),
-                .entry, .item, .odh-entry, .odh-item {
-                    display: flex !important;
-                    flex-direction: column !important;
-                }
-
-                /* Order 1: ĐỊNH NGHĨA luôn luôn xếp LÊN TRÊN */
-                .definitions, .odh-def-box {
-                    order: 1 !important;
-                    margin-bottom: 4px !important;
-                }
-
-                /* Order 2: VÍ DỤ luôn luôn xếp XUỐNG DƯỚI */
-                .extrainfo, .odh-extra {
-                    order: 2 !important;
-                    margin-top: 4px !important;
-                    margin-bottom: 8px !important;
+                /* Khối Định nghĩa */
+                .odh-def-box {
+                    display: block !important;
+                    margin-bottom: 6px !important;
                 }
 
                 /* Style nhãn POS & [C, U] */
@@ -188,7 +170,12 @@ class encn_Oxford {
                     font-weight: 500 !important;
                 }
 
-                /* Khung danh sách ví dụ */
+                /* Khung danh sách ví dụ nằm ngay bên dưới định nghĩa */
+                .odh-extra {
+                    margin-top: 6px !important;
+                    margin-bottom: 8px !important;
+                }
+
                 ul.sents {
                     font-size: 0.9em !important;
                     list-style: square inside !important;
