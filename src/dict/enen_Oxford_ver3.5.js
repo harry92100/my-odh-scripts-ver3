@@ -7,7 +7,7 @@ class encn_Oxford {
 
     // Tên hiển thị trong mục cài đặt ODH
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.4';
+        return 'Oxford EN-EN Dictionary ver3.5';
     }
 
     setOptions(options) {
@@ -98,7 +98,7 @@ class encn_Oxford {
             let senses = doc.querySelectorAll('.sense');
             let entries = [];
 
-            senses.forEach((sense) => {
+            senses.forEach((sense, index) => {
                 let defText = sense.querySelector('.def')?.textContent;
                 if (!defText) return;
 
@@ -133,12 +133,13 @@ class encn_Oxford {
                     ? `<div class="odh-extra"><ul class="sents">${allExListHtml}</ul></div>` 
                     : '';
 
+                // Chỉ giữ Tiêu đề, Phiên âm và Loa ở nghĩa đầu tiên (index === 0) để triệt tiêu lặp ở nghĩa 2, 3...
                 entries.push({
                     css: encn_Oxford.renderCSS(),
-                    expression,
-                    reading,
+                    expression: index === 0 ? expression : '',
+                    reading: index === 0 ? reading : '',
                     definitions: [defBlock],
-                    audios,
+                    audios: index === 0 ? audios : [],
                     extrainfo
                 });
             });
@@ -153,17 +154,21 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Đảo thứ tự hiển thị trên Pop-up ODH: Định nghĩa xếp trên, ExtraInfo (Ví dụ) xếp dưới */
-                div:has(> .odh-extra) {
+                /* Ép khung chứa của ODH sắp xếp theo chiều dọc (Flex Column) */
+                div:has(.odh-def-box):has(.odh-extra) {
                     display: flex !important;
                     flex-direction: column !important;
                 }
-                
-                .odh-def-box {
+
+                /* Định nghĩa luôn nằm ở trên (Order 1) */
+                div:has(.odh-def-box):has(.odh-extra) > div:has(.odh-def-box),
+                div:has(> .odh-def-box) {
                     order: 1 !important;
                 }
-                
-                .odh-extra {
+
+                /* Khối Ví dụ luôn nằm bên DƯỚI Định nghĩa (Order 2) */
+                div:has(.odh-def-box):has(.odh-extra) > div:has(.odh-extra),
+                div:has(> .odh-extra) {
                     order: 2 !important;
                     margin-top: 4px !important;
                     margin-bottom: 6px !important;
