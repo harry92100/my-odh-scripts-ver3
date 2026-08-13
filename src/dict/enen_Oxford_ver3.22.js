@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.21 (Separated Fields & Full Examples)';
+        return 'Oxford EN-EN Dictionary ver3.22 (Perfect Layout)';
     }
 
     setOptions(options) {
@@ -17,7 +17,7 @@ class encn_Oxford {
         this.word = word;
         let deflection = await api.deinflect(word) || [];
 
-        // Lọc chữ cái đơn lẻ rác nếu từ tra dài > 2 ký tự (như 'e', 'd' khi tra 'education')
+        // Lọc rác chữ cái đơn lẻ nếu từ tra dài > 2 ký tự (như 'e', 'd' khi tra 'education')
         let cleanWordStr = word.trim();
         if (cleanWordStr.length > 2) {
             deflection = deflection.filter(x => x && x.trim().length > 1);
@@ -137,7 +137,7 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // LẤY TẤT CẢ VÍ DỤ (100% không bị ẩn/cắt bỏ)
+                // LẤY TOÀN BỘ VÍ DỤ CHO ANKI
                 let examples = Array.from(sense.querySelectorAll('.examples .x'));
                 let exListHtml = '';
                 examples.forEach((ex) => {
@@ -145,10 +145,10 @@ class encn_Oxford {
                     exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // FIELD 1: DEFINITION - CHỈ ĐỊNH NGHĨA + POS + GRAMMAR (HOÀN TOÀN KHÔNG CÓ VÍ DỤ)
+                // FIELD 1: DEFINITION - CHỈ ĐỊNH NGHĨA
                 let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
 
-                // FIELD 2: EXTRAINFO - CHỈ CÓ VÍ DỤ (ĐẦY ĐỦ 100%)
+                // FIELD 2: EXTRAINFO - CHỈ VÍ DỤ
                 let extrainfoBlock = exListHtml 
                     ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
                     : '';
@@ -157,8 +157,8 @@ class encn_Oxford {
                     css: encn_Oxford.renderCSS(),
                     expression: expression,
                     reading: reading,
-                    definitions: [defBlock],    // Đưa riêng vào Field Definition
-                    extrainfo: extrainfoBlock,  // Đưa riêng vào Field ExtraInfo
+                    definitions: [defBlock],
+                    extrainfo: extrainfoBlock,
                     audios: audios
                 });
             });
@@ -211,26 +211,38 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* ÉP CONTAINER TRÊN POPUP ODH: ĐỊNH NGHĨA XẾP TRÊN (ORDER 1), VÍ DỤ XẾP DƯỚI (ORDER 2) */
-                .entry, .item, .odh-entry, .odh-item, [class*="entry"], [class*="item"] {
+                /* 1. BẮT BUỘC KHUNG CONTAINER CHUYỂN DẠNG FLEXBOX ĐỂ ĐẢO THỨ TỰ */
+                body, html, #popup, .popup, .dict-content, .dict-item, .item, .entry, .odh-entry, .odh-item, [class*="item"], [class*="entry"] {
                     display: flex !important;
                     flex-direction: column !important;
                 }
-                .expression, .reading, .phonetic, .audios, .header, [class*="header"] {
+
+                /* Header (Từ vựng, phiên âm, loa) nằm trên cùng (Order 0) */
+                .expression, .reading, .phonetic, .audios, .header, .head, [class*="header"], [class*="head"] {
                     order: 0 !important;
                 }
-                .definitions, .odh-definitions, [class*="definition"] {
+
+                /* KHỐI ĐỊNH NGHĨA BẮT BUỘC NẰM Ở TRÊN (Order 1) */
+                .definitions, .odh-definitions, .definition, [class*="definition"], [class*="def"] {
                     order: 1 !important;
                     margin-bottom: 4px !important;
                 }
-                .extrainfo, .odh-extrainfo, [class*="extrainfo"], [class*="extra"] {
+
+                /* KHỐI VÍ DỤ BẮT BUỘC NẰM Ở DƯỚI (Order 2) */
+                .extrainfo, .odh-extrainfo, .extra_info, .extra, .notes, [class*="extrainfo"], [class*="extra"] {
                     order: 2 !important;
-                    margin-top: 2px !important;
+                    margin-top: 4px !important;
                     margin-bottom: 8px !important;
                 }
 
-                /* HOÀN TOÀN KHÔNG NGHĨA ẨN CÂU VÍ DỤ NÀO HOẶC CẮT BỚT NÀO */
+                /* 2. POPUP CHỈ HIỂN THỊ XEM TRƯỚC TỐI ĐA 2 VÍ DỤ (ANKI VẪN LƯU ĐỦ 100%) */
+                .odh-extra ul.sents li.sent:nth-child(n+3),
+                .extrainfo ul.sents li.sent:nth-child(n+3),
+                [class*="extra"] ul.sents li.sent:nth-child(n+3) {
+                    display: none !important;
+                }
 
+                /* Style nhãn POS */
                 span.pos {
                     font-size: 0.85em !important;
                     margin-right: 6px !important;
