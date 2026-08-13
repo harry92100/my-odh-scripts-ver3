@@ -2,18 +2,16 @@
 class encn_Oxford {
     constructor(options) {
         this.options = options;
-        this.maxexample = 2; // Số câu ví dụ xem trước trên Popup ODH
         this.word = '';
     }
 
-    // Tên hiển thị trong mục Selected Dict. của ODH
+    // Tên hiển thị trong mục cài đặt ODH
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.1';
+        return 'Oxford EN-EN Dictionary ver3.3';
     }
 
     setOptions(options) {
         this.options = options;
-        this.maxexample = options.maxexample || 2;
     }
 
     async findTerm(word) {
@@ -66,17 +64,24 @@ class encn_Oxford {
             // 4. Loại từ chính (POS)
             let mainPos = doc.querySelector('.pos')?.textContent || '';
 
-            // Hàm chuẩn hóa & viết tắt thuộc tính grammar/countability (Countable -> [C], Uncountable -> [U]...)
+            // Quét thuộc tính đếm được ở cấp tiêu đề toàn bài
+            let topGrammarEl = doc.querySelector('.webtop-g .grammar') || 
+                               doc.querySelector('.top-g .grammar') || 
+                               doc.querySelector('.pos + .grammar');
+            let topGrammarText = topGrammarEl ? topGrammarEl.textContent.trim() : '';
+
+            // Hàm chuẩn hóa & viết tắt thuộc tính grammar/countability
             let formatGrammar = (str) => {
                 if (!str) return '';
-                let formatted = str.trim()
+                let formatted = str.replace(/\[/g, '').replace(/\]/g, '').trim();
+                formatted = formatted
+                    .replace(/\bcountable,\s*uncountable\b/gi, 'C, U')
+                    .replace(/\buncountable,\s*countable\b/gi, 'C, U')
                     .replace(/\bcountable\b/gi, 'C')
                     .replace(/\buncountable\b/gi, 'U')
                     .replace(/\bsingular\b/gi, 'sing.')
                     .replace(/\bplural\b/gi, 'pl.');
-                if (!formatted.startsWith('[')) formatted = '[' + formatted;
-                if (!formatted.endsWith(']')) formatted = formatted + ']';
-                return formatted;
+                return `[${formatted}]`;
             };
 
             // Hàm in đậm từ cần tra trong câu ví dụ
@@ -85,7 +90,7 @@ class encn_Oxford {
                 return text.replace(reg, `<b>$&</b>`);
             };
 
-            // 5. Bóc tách từng Nét nghĩa (Sense) thành các đối tượng độc lập
+            // 5. Bóc tách từng Nét nghĩa (Sense) thành các mục riêng
             let senses = doc.querySelectorAll('.sense');
             let entries = [];
 
@@ -93,11 +98,11 @@ class encn_Oxford {
                 let defText = sense.querySelector('.def')?.textContent;
                 if (!defText) return;
 
-                // Lấy thông tin đếm được / không đếm được từ nhiều vị trí có thể có trên Oxford
-                let grammarEl = sense.querySelector('.grammar') || 
-                                sense.querySelector('.sensetop .grammar') ||
-                                sense.querySelector('.grammar-g');
-                let grammarText = grammarEl ? grammarEl.textContent.trim() : '';
+                // Ưu tiên grammar tại Sense, nếu không có sẽ dùng grammar chung ở tiêu đề
+                let senseGrammarEl = sense.querySelector('.grammar') || 
+                                     sense.querySelector('.sensetop .grammar') ||
+                                     sense.querySelector('.grammar-g');
+                let grammarText = senseGrammarEl ? senseGrammarEl.textContent.trim() : topGrammarText;
                 let formattedGrammar = formatGrammar(grammarText);
 
                 // Ghép [Loại từ] + [Viết tắt đếm được]
@@ -107,32 +112,19 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // Bóc tách câu ví dụ
+                // Bóc tách TOÀN BỘ câu ví dụ dành riêng cho trường ExtraInfo
                 let allExamples = sense.querySelectorAll('.examples .x');
                 let allExListHtml = '';
-                let previewExListHtml = '';
 
-                allExamples.forEach((ex, exIdx) => {
+                allExamples.forEach((ex) => {
                     let exText = highlightWord(ex.textContent.trim());
-                    let itemHtml = `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
-
-                    // Gom 100% ví dụ dành cho Anki ExtraInfo
-                    allExListHtml += itemHtml;
-
-                    // Chỉ lấy tối đa 1-2 ví dụ cho Popup ODH
-                    if (exIdx < this.maxexample) {
-                        previewExListHtml += itemHtml;
-                    }
+                    allExListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // Khối giao diện xem trước trên Pop-up ODH (Chỉ chứa 1-2 ví dụ)
-                let previewExamplesBlock = previewExListHtml 
-                    ? `<div class="odh-preview-only"><ul class="sents">${previewExListHtml}</ul></div>` 
-                    : '';
-                
-                let defBlock = `<div>${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span>${previewExamplesBlock}</div>`;
+                // Trường Definitions: CHỈ CHỨA Loại từ + Định nghĩa (TUYỆT ĐỐI KHÔNG DÍNH VÍ DỤ)
+                let defBlock = `<div>${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
 
-                // Khối chứa TOÀN BỘ ví dụ dành cho Anki (Bọc trong .odh-extra để triệt tiêu hiển thị trên Popup)
+                // Trường ExtraInfo: Chứa TOÀN BỘ ví dụ của riêng nét nghĩa này
                 let extrainfo = allExListHtml 
                     ? `<div class="odh-extra"><ul class="sents">${allExListHtml}</ul></div>` 
                     : '';
@@ -157,14 +149,14 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Triệt tiêu khối extrainfo tràn màn hình ở phía trên cùng Pop-up ODH */
-                .odh-extra { display: none !important; }
-
                 div.dis {font-weight: bold; margin-bottom:3px; padding:0;}
                 span.pos {text-transform:lowercase; font-size:0.85em; margin-right:5px; padding:2px 6px; color:white; background-color:#0d47a1; border-radius:3px; font-weight:normal; display:inline-block;}
                 span.tran {margin:0; padding:0; line-height:1.4;}
                 span.eng_tran {margin-right:3px; padding:0; color:#222; font-weight:500;}
-                ul.sents {font-size:0.9em; list-style:square inside; margin:6px 0 4px 0; padding:6px 10px; background:rgba(13,71,161,0.06); border-radius:4px;}
+                
+                /* Tối ưu hiển thị khối ExtraInfo gọn gàng trên Pop-up ODH */
+                .odh-extra {max-height: 160px; overflow-y: auto;}
+                ul.sents {font-size:0.9em; list-style:square inside; margin:4px 0; padding:6px 10px; background:rgba(13,71,161,0.06); border-radius:4px;}
                 li.sent {margin:3px 0; padding:0; color:#444;}
                 span.eng_sent {margin-right:5px;}
                 li.sent b {color: #0d47a1;}
