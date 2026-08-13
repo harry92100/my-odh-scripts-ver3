@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.13';
+        return 'Oxford EN-EN Dictionary ver3.14';
     }
 
     setOptions(options) {
@@ -110,29 +110,30 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // Bóc tách câu ví dụ
-                let allExamples = sense.querySelectorAll('.examples .x');
-                let allExListHtml = '';
+                // Bóc tách câu ví dụ - Giới hạn CHÍNH XÁC TỐI ĐA 2 CÂU bằng .slice(0, 2)
+                let allExamples = Array.from(sense.querySelectorAll('.examples .x')).slice(0, 2);
+                let exListHtml = '';
 
                 allExamples.forEach((ex) => {
                     let exText = highlightWord(ex.textContent.trim());
-                    allExListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
+                    exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // 🎯 ĐIỂM CỐT LÕI: Gộp Định nghĩa + Ví dụ trực tiếp theo đúng thứ tự hiển thị
-                let combinedDefHtml = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
+                // FIELD 1: Definition - Tách riêng 100% (chỉ chứa Định nghĩa + POS)
+                let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
 
-                if (allExListHtml) {
-                    combinedDefHtml += `<div class="odh-extra"><ul class="sents">${allExListHtml}</ul></div>`;
-                }
+                // FIELD 2: ExtraInfo - Tách riêng 100% (chỉ chứa tối đa 2 ví dụ)
+                let extrainfoBlock = exListHtml 
+                    ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
+                    : '';
 
                 entries.push({
                     css: encn_Oxford.renderCSS(),
                     expression: index === 0 ? expression : '\u200B',
                     reading: index === 0 ? reading : '',
-                    definitions: [combinedDefHtml],
-                    audios: index === 0 ? audios : [],
-                    extrainfo: '' // Bỏ trống để tránh việc ODH tự đẩy ví dụ lên trên
+                    definitions: [defBlock],     // Gửi sang ô Definition trong Anki
+                    extrainfo: extrainfoBlock,   // Gửi sang ô Example / ExtraInfo trong Anki
+                    audios: index === 0 ? audios : []
                 });
             });
 
@@ -146,9 +147,22 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Khối Định nghĩa */
-                .odh-def-box {
-                    display: block !important;
+                /* Ép khung item của ODH thành Flexbox chiều dọc */
+                .entry, .item, .odh-entry, .odh-item {
+                    display: flex !important;
+                    flex-direction: column !important;
+                }
+
+                /* 1. ĐỊNH NGHĨA (.definitions) xếp LÊN TRÊN */
+                .definitions, .odh-definitions {
+                    order: 1 !important;
+                    margin-bottom: 2px !important;
+                }
+
+                /* 2. VÍ DỤ (.extrainfo) xếp XUỐNG DƯỚI */
+                .extrainfo, .odh-extrainfo {
+                    order: 2 !important;
+                    margin-top: 2px !important;
                     margin-bottom: 6px !important;
                 }
 
@@ -170,12 +184,7 @@ class encn_Oxford {
                     font-weight: 500 !important;
                 }
 
-                /* Khung danh sách ví dụ nằm ngay bên dưới định nghĩa */
-                .odh-extra {
-                    margin-top: 6px !important;
-                    margin-bottom: 8px !important;
-                }
-
+                /* Khung danh sách ví dụ */
                 ul.sents {
                     font-size: 0.9em !important;
                     list-style: square inside !important;
