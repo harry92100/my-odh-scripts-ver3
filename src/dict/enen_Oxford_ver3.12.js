@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.11';
+        return 'Oxford EN-EN Dictionary ver3.12';
     }
 
     setOptions(options) {
@@ -63,13 +63,11 @@ class encn_Oxford {
             // 4. Loại từ chính (POS)
             let mainPos = doc.querySelector('.pos')?.textContent || '';
 
-            // Quét thuộc tính grammar / countability
             let topGrammarEl = doc.querySelector('.webtop-g .grammar') || 
                                doc.querySelector('.top-g .grammar') || 
                                doc.querySelector('.pos + .grammar');
             let topGrammarText = topGrammarEl ? topGrammarEl.textContent.trim() : '';
 
-            // Chuẩn hóa nhãn grammar [C, U]
             let formatGrammar = (str) => {
                 if (!str) return '';
                 let clean = str.replace(/\[/g, '').replace(/\]/g, '').trim();
@@ -87,7 +85,6 @@ class encn_Oxford {
                 return `[${formatted}]`;
             };
 
-            // In đậm từ cần tra trong câu ví dụ
             let highlightWord = (text) => {
                 let reg = new RegExp(`\\b${word}\\b`, 'gi');
                 return text.replace(reg, `<b>$&</b>`);
@@ -113,7 +110,7 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // Bóc tách câu ví dụ cho trường ExtraInfo
+                // Bóc tách câu ví dụ
                 let allExamples = sense.querySelectorAll('.examples .x');
                 let allExListHtml = '';
 
@@ -122,11 +119,11 @@ class encn_Oxford {
                     allExListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
                 });
 
-                // Definition (Gửi Anki clean 100%)
+                // Khối 1: Định nghĩa độc lập
                 let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
 
-                // ExtraInfo (Gửi Anki clean 100%)
-                let extrainfo = allExListHtml 
+                // Khối 2: Ví dụ độc lập
+                let extrainfoBlock = allExListHtml 
                     ? `<div class="odh-extra"><ul class="sents">${allExListHtml}</ul></div>` 
                     : '';
 
@@ -134,9 +131,9 @@ class encn_Oxford {
                     css: encn_Oxford.renderCSS(),
                     expression: index === 0 ? expression : '\u200B',
                     reading: index === 0 ? reading : '',
-                    definitions: [defBlock],
-                    audios: index === 0 ? audios : [],
-                    extrainfo
+                    definitions: [defBlock],     // Xuất vào Field Definition trên Anki
+                    extrainfo: extrainfoBlock,   // Xuất vào Field ExtraInfo/Example trên Anki
+                    audios: index === 0 ? audios : []
                 });
             });
 
@@ -150,41 +147,27 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Target chính xác các khung chứa cha của ODH để kích hoạt Flexbox */
-                .entry, .item, .odh-entry, .odh-item, 
+                /* Ép tất cả các thẻ cha chứa nội dung trong Pop-up sang dạng Flex Column */
                 div:has(> .definitions), 
-                div:has(> .extrainfo) {
+                div:has(> .extrainfo),
+                div:has(> .odh-def-box),
+                div:has(> .odh-extra),
+                .entry, .item, .odh-entry, .odh-item {
                     display: flex !important;
                     flex-direction: column !important;
                 }
 
-                /* Order 1: Tiêu đề từ vựng + Phiên âm + Âm thanh ở TRÊN CÙNG */
-                .expression, .odh-expression, .head, .reading, .odh-reading, .audios {
+                /* Order 1: ĐỊNH NGHĨA luôn luôn xếp LÊN TRÊN */
+                .definitions, .odh-def-box {
                     order: 1 !important;
+                    margin-bottom: 4px !important;
                 }
 
-                /* Order 2: Thẻ chứa Định nghĩa bắt buộc nằm ở GIỮA */
-                .definitions, .odh-definitions {
+                /* Order 2: VÍ DỤ luôn luôn xếp XUỐNG DƯỚI */
+                .extrainfo, .odh-extra {
                     order: 2 !important;
                     margin-top: 4px !important;
-                }
-
-                /* Order 3: Thẻ chứa Ví dụ bắt buộc nằm ở DƯỚI CÙNG */
-                .extrainfo, .odh-extrainfo {
-                    order: 3 !important;
-                    margin-top: 6px !important;
                     margin-bottom: 8px !important;
-                }
-
-                /* Đảm bảo nội dung bên trong .definitions không bị xáo trộn */
-                .odh-def-box {
-                    display: block !important;
-                }
-
-                /* Giới hạn tối đa 2 câu ví dụ trên Pop-up ODH */
-                .odh-extra ul.sents li.sent:nth-child(n+3),
-                .extrainfo ul.sents li.sent:nth-child(n+3) {
-                    display: none !important;
                 }
 
                 /* Style nhãn POS & [C, U] */
