@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.22 (Perfect Layout)';
+        return 'Oxford EN-EN Dictionary ver3.23 (Collocation Fix)';
     }
 
     setOptions(options) {
@@ -17,7 +17,7 @@ class encn_Oxford {
         this.word = word;
         let deflection = await api.deinflect(word) || [];
 
-        // Lọc rác chữ cái đơn lẻ nếu từ tra dài > 2 ký tự (như 'e', 'd' khi tra 'education')
+        // Lọc rác chữ cái đơn lẻ nếu từ tra dài > 2 ký tự
         let cleanWordStr = word.trim();
         if (cleanWordStr.length > 2) {
             deflection = deflection.filter(x => x && x.trim().length > 1);
@@ -115,6 +115,42 @@ class encn_Oxford {
                 return false;
             };
 
+            // HÀM BÓC TÁCH CẢ CỤM MẪU (.cf) VÀ CÂU VÍ DỤ (.x)
+            let extractExamples = (container) => {
+                let exampleLiEls = container.querySelectorAll('.examples > li, .examples li');
+                let exListHtml = '';
+
+                if (exampleLiEls.length > 0) {
+                    exampleLiEls.forEach((li) => {
+                        let cfEl = li.querySelector('.cf, .labels');
+                        let cfText = cfEl ? cfEl.textContent.trim() : '';
+
+                        let exEl = li.querySelector('.x');
+                        let exText = exEl ? highlightWord(exEl.textContent.trim()) : '';
+
+                        let fullExHtml = '';
+                        if (cfText && exText) {
+                            fullExHtml = `<strong class="cf-prefix">${cfText}</strong> ${exText}`;
+                        } else if (cfText && !exText) {
+                            fullExHtml = `<strong class="cf-prefix">${cfText}</strong>`;
+                        } else {
+                            fullExHtml = exText;
+                        }
+
+                        if (fullExHtml) {
+                            exListHtml += `<li class='sent'><span class='eng_sent'>${fullExHtml}</span></li>`;
+                        }
+                    });
+                } else {
+                    let examples = Array.from(container.querySelectorAll('.examples .x'));
+                    examples.forEach((ex) => {
+                        let exText = highlightWord(ex.textContent.trim());
+                        exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
+                    });
+                }
+                return exListHtml;
+            };
+
             let entries = [];
 
             // --- A. BÓC TÁCH NÉT NGHĨA THƯỜNG (SENSES) ---
@@ -137,18 +173,9 @@ class encn_Oxford {
                 }
                 let posHtml = posInfo ? `<span class="pos">${posInfo.trim()}</span>` : '';
 
-                // LẤY TOÀN BỘ VÍ DỤ CHO ANKI
-                let examples = Array.from(sense.querySelectorAll('.examples .x'));
-                let exListHtml = '';
-                examples.forEach((ex) => {
-                    let exText = highlightWord(ex.textContent.trim());
-                    exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
-                });
+                let exListHtml = extractExamples(sense);
 
-                // FIELD 1: DEFINITION - CHỈ ĐỊNH NGHĨA
                 let defBlock = `<div class="odh-def-box">${posHtml}<span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
-
-                // FIELD 2: EXTRAINFO - CHỈ VÍ DỤ
                 let extrainfoBlock = exListHtml 
                     ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
                     : '';
@@ -178,12 +205,7 @@ class encn_Oxford {
                         posHtml += `<strong class="idm-title">${idmTitle}</strong>`;
                     }
 
-                    let examples = Array.from(sense.querySelectorAll('.examples .x'));
-                    let exListHtml = '';
-                    examples.forEach((ex) => {
-                        let exText = highlightWord(ex.textContent.trim());
-                        exListHtml += `<li class='sent'><span class='eng_sent'>${exText}</span></li>`;
-                    });
+                    let exListHtml = extractExamples(sense);
 
                     let defBlock = `<div class="odh-def-box">${posHtml} <span class='tran'><span class='eng_tran'>${defText.trim()}</span></span></div>`;
                     let extrainfoBlock = exListHtml 
@@ -211,38 +233,32 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* 1. BẮT BUỘC KHUNG CONTAINER CHUYỂN DẠNG FLEXBOX ĐỂ ĐẢO THỨ TỰ */
                 body, html, #popup, .popup, .dict-content, .dict-item, .item, .entry, .odh-entry, .odh-item, [class*="item"], [class*="entry"] {
                     display: flex !important;
                     flex-direction: column !important;
                 }
 
-                /* Header (Từ vựng, phiên âm, loa) nằm trên cùng (Order 0) */
                 .expression, .reading, .phonetic, .audios, .header, .head, [class*="header"], [class*="head"] {
                     order: 0 !important;
                 }
 
-                /* KHỐI ĐỊNH NGHĨA BẮT BUỘC NẰM Ở TRÊN (Order 1) */
                 .definitions, .odh-definitions, .definition, [class*="definition"], [class*="def"] {
                     order: 1 !important;
                     margin-bottom: 4px !important;
                 }
 
-                /* KHỐI VÍ DỤ BẮT BUỘC NẰM Ở DƯỚI (Order 2) */
                 .extrainfo, .odh-extrainfo, .extra_info, .extra, .notes, [class*="extrainfo"], [class*="extra"] {
                     order: 2 !important;
                     margin-top: 4px !important;
                     margin-bottom: 8px !important;
                 }
 
-                /* 2. POPUP CHỈ HIỂN THỊ XEM TRƯỚC TỐI ĐA 2 VÍ DỤ (ANKI VẪN LƯU ĐỦ 100%) */
                 .odh-extra ul.sents li.sent:nth-child(n+3),
                 .extrainfo ul.sents li.sent:nth-child(n+3),
                 [class*="extra"] ul.sents li.sent:nth-child(n+3) {
                     display: none !important;
                 }
 
-                /* Style nhãn POS */
                 span.pos {
                     font-size: 0.85em !important;
                     margin-right: 6px !important;
@@ -259,6 +275,11 @@ class encn_Oxford {
                 }
                 strong.idm-title {
                     color: #b71c1c !important;
+                    font-weight: bold !important;
+                    margin-right: 6px !important;
+                }
+                strong.cf-prefix {
+                    color: #1a237e !important;
                     font-weight: bold !important;
                     margin-right: 6px !important;
                 }
