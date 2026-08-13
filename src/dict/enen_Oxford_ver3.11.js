@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.10';
+        return 'Oxford EN-EN Dictionary ver3.11';
     }
 
     setOptions(options) {
@@ -132,7 +132,6 @@ class encn_Oxford {
 
                 entries.push({
                     css: encn_Oxford.renderCSS(),
-                    // Dùng Zero-Width Space \u200B cho nét nghĩa phụ để tránh ODH chèn lại tên từ
                     expression: index === 0 ? expression : '\u200B',
                     reading: index === 0 ? reading : '',
                     definitions: [defBlock],
@@ -151,39 +150,44 @@ class encn_Oxford {
     static renderCSS() {
         return `
             <style>
-                /* Nhắm chính xác khung chứa từng Nét nghĩa để áp dụng Flexbox xếp cột */
-                div:has(> .odh-def-box),
-                div:has(> .odh-extra),
-                .entry, .item, .odh-entry, .odh-item {
+                /* Target chính xác các khung chứa cha của ODH để kích hoạt Flexbox */
+                .entry, .item, .odh-entry, .odh-item, 
+                div:has(> .definitions), 
+                div:has(> .extrainfo) {
                     display: flex !important;
                     flex-direction: column !important;
                 }
 
-                /* Order 1: Tiêu đề từ vựng + Phiên âm luôn nằm TRÊN CÙNG */
-                .expression, .odh-expression, .head, .reading, .odh-reading {
+                /* Order 1: Tiêu đề từ vựng + Phiên âm + Âm thanh ở TRÊN CÙNG */
+                .expression, .odh-expression, .head, .reading, .odh-reading, .audios {
                     order: 1 !important;
                 }
 
-                /* Order 2: Ô Định nghĩa bắt buộc nằm ở GIỮA */
-                .definitions, .odh-definitions, .odh-def-box {
+                /* Order 2: Thẻ chứa Định nghĩa bắt buộc nằm ở GIỮA */
+                .definitions, .odh-definitions {
                     order: 2 !important;
                     margin-top: 4px !important;
                 }
 
-                /* Order 3: Khung Ví dụ bắt buộc đẩy xuống DƯỚI CÙNG */
-                .extrainfo, .odh-extrainfo, .odh-extra {
+                /* Order 3: Thẻ chứa Ví dụ bắt buộc nằm ở DƯỚI CÙNG */
+                .extrainfo, .odh-extrainfo {
                     order: 3 !important;
                     margin-top: 6px !important;
-                    margin-bottom: 10px !important;
+                    margin-bottom: 8px !important;
                 }
 
-                /* Giới hạn hiển thị tối đa 2 câu ví dụ trên Pop-up */
+                /* Đảm bảo nội dung bên trong .definitions không bị xáo trộn */
+                .odh-def-box {
+                    display: block !important;
+                }
+
+                /* Giới hạn tối đa 2 câu ví dụ trên Pop-up ODH */
                 .odh-extra ul.sents li.sent:nth-child(n+3),
                 .extrainfo ul.sents li.sent:nth-child(n+3) {
                     display: none !important;
                 }
 
-                /* Định dạng nhãn POS & [C, U] */
+                /* Style nhãn POS & [C, U] */
                 span.pos {
                     font-size: 0.85em !important;
                     margin-right: 6px !important;
@@ -193,7 +197,7 @@ class encn_Oxford {
                     border-radius: 3px !important;
                     font-weight: bold !important;
                     display: inline-block !important;
-                    text-transform: none !important; /* Giữ chữ in hoa [C, U] */
+                    text-transform: none !important;
                 }
 
                 span.eng_tran {
