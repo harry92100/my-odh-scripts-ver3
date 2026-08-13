@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.17 (Auto-Redirect Fix)';
+        return 'Oxford EN-EN Dictionary ver3.18 (Full Data Fix)';
     }
 
     setOptions(options) {
@@ -29,7 +29,6 @@ class encn_Oxford {
             let parser = new DOMParser();
             let doc = parser.parseFromString(html, 'text/html');
             
-            // Kiểm tra xem có chứa nội dung từ điển thật hay không
             let entry = doc.querySelector('.webtop-g') || doc.querySelector('.top-g') || doc.querySelector('.entry');
             if (entry) return doc;
             return null;
@@ -44,7 +43,7 @@ class encn_Oxford {
         let cleanWord = word.trim().toLowerCase().replace(/\s+/g, '-');
         let baseUrl = `https://www.oxfordlearnersdictionaries.com/definition/english/${encodeURIComponent(cleanWord)}`;
 
-        // CƠ CHẾ SỬA LỖI 1: Thử đường dẫn gốc, nếu không thấy thì thử thêm hậu tố _1
+        // Thử URL gốc, nếu không thấy thì thử thêm hậu tố _1
         let doc = await this.fetchDocument(baseUrl);
         if (!doc) {
             let fallbackUrl = `${baseUrl}_1`;
@@ -64,7 +63,7 @@ class encn_Oxford {
                 reading = `UK ${phUk}  US ${phUs}`.trim();
             }
 
-            // 2. Audio MP3
+            // 2. Audio MP3 (Gửi cho tất cả nét nghĩa)
             let audios = [];
             let ukAudioEl = doc.querySelector('.phons_br .audio_play_button');
             let usAudioEl = doc.querySelector('.phons_n_am .audio_play_button');
@@ -96,14 +95,12 @@ class encn_Oxford {
                 return `[${formatted}]`;
             };
 
-            // Tránh lỗi Regex nếu từ chứa ký tự đặc biệt
             let escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             let highlightWord = (text) => {
                 let reg = new RegExp(`\\b${escapeRegex(word)}\\b`, 'gi');
                 return text.replace(reg, `<b>$&</b>`);
             };
 
-            // Hàm kiểm tra xem phần tử có nằm trong Idiom (.idm-g) hay không
             let isInsideIdiom = (el) => {
                 let p = el.parentElement;
                 while (p) {
@@ -114,7 +111,6 @@ class encn_Oxford {
             };
 
             let entries = [];
-            let globalIndex = 0;
 
             // --- A. BÓC TÁCH NÉT NGHĨA THƯỜNG (SENSES) ---
             let allSenses = Array.from(doc.querySelectorAll('.sense'));
@@ -148,15 +144,15 @@ class encn_Oxford {
                     ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
                     : '';
 
+                // LUÔN LUÔN GỬI ĐẦY ĐỦ: expression, reading, audios CHO MỌI THẺ
                 entries.push({
                     css: encn_Oxford.renderCSS(),
-                    expression: globalIndex === 0 ? expression : '\u200B',
-                    reading: globalIndex === 0 ? reading : '',
+                    expression: expression,
+                    reading: reading,
                     definitions: [defBlock],
                     extrainfo: extrainfoBlock,
-                    audios: globalIndex === 0 ? audios : []
+                    audios: audios
                 });
-                globalIndex++;
             });
 
             // --- B. BÓC TÁCH KHỐI THÀNH NGỮ (IDIOMS) ---
@@ -186,15 +182,15 @@ class encn_Oxford {
                         ? `<div class="odh-extra"><ul class="sents">${exListHtml}</ul></div>` 
                         : '';
 
+                    // LUÔN LUÔN GỬI ĐẦY ĐỦ CHO THÀNH NGỮ
                     entries.push({
                         css: encn_Oxford.renderCSS(),
-                        expression: globalIndex === 0 ? expression : '\u200B',
-                        reading: globalIndex === 0 ? reading : '',
+                        expression: expression,
+                        reading: reading,
                         definitions: [defBlock],
                         extrainfo: extrainfoBlock,
-                        audios: globalIndex === 0 ? audios : []
+                        audios: audios
                     });
-                    globalIndex++;
                 });
             });
 
