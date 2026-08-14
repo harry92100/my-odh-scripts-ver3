@@ -6,7 +6,7 @@ class encn_Oxford {
     }
 
     async displayName() {
-        return 'Oxford EN-EN Dictionary ver3.26 (Multi-POS & Verb-Form Support)';
+        return 'Oxford EN-EN Dictionary ver3.27 (Multi-POS & Verb-Form Support)';
     }
 
     setOptions(options) {
@@ -393,9 +393,10 @@ class encn_Oxford {
                     margin-bottom: 8px !important;
                 }
 
-                .odh-extra ul.sents li.sent:nth-child(n+3),
-                .extrainfo ul.sents li.sent:nth-child(n+3),
-                [class*="extra"] ul.sents li.sent:nth-child(n+3) {
+                /* CHỈ ẨN TỪ DÒNG THỨ 3 TRÊN POPUP CỦA TRÌNH DUYỆT */
+                #popup .odh-extra ul.sents li.sent:nth-child(n+3),
+                .popup .odh-extra ul.sents li.sent:nth-child(n+3),
+                .dict-content .odh-extra ul.sents li.sent:nth-child(n+3) {
                     display: none !important;
                 }
 
